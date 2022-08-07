@@ -9,7 +9,7 @@ logging.set_verbosity_error()
 torch.seed = 123
 
 class tBERT(nn.Module):
-    def __init__(self, num_topics=10, batch_size=64, corpus=['']):
+    def __init__(self, num_topics=80, batch_size=64, corpus=['']):
         super(tBERT, self).__init__()
 
         # Loading Bert model
