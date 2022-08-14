@@ -68,8 +68,8 @@ class tBERT(nn.Module):
 
       # concatenate
       features = torch.cat([features_lda, features_bert],dim=1)
-      self.aa = features
-      self.bb = features_bert
+
+      
       
       # classification
       outputs = self.classifier(features)
