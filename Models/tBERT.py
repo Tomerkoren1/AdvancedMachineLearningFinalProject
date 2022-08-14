@@ -39,10 +39,6 @@ class tBERT(nn.Module):
     def tokenize_2_sentences(self,sentence1,sentence2):
       return self.tokenizer_bert(sentence1,sentence2,return_tensors='pt',padding="max_length", pad_to_max_length=True,truncation=True)["input_ids"]
 
-    def freeze_BERT(self,):
-      for param in self.model_bert.parameters():
-        param.requires_grad = False
-
     def forward(self, inputs):
       inputs1,inputs2 = inputs
       
