@@ -81,7 +81,7 @@ def train():
 
         # save model results
         df_topic = pd.DataFrame({'#Topics':str(n),'F1':f1_score,'Train_Loss':trainer.loss_train,'Val_Loss':trainer.loss_val,'Epoch':range(epochs)})
-        df = df.append(df_topic)
+        df = df.append(df_topic, ignore_index=True)
 
     # Plots
     display_plots(df)
