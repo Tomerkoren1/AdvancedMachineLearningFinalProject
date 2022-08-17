@@ -4,14 +4,16 @@ from Trainer.tBertTrainer import tBertTrainer
 from Dataset.PairSentencesDataset import PairSentencesDataset
 from torch.utils.data import DataLoader
 import nltk
-nltk.download('stopwords')
-nltk.download('averaged_perceptron_tagger')
+# nltk.download('stopwords')
+# nltk.download('averaged_perceptron_tagger')
 from nltk.corpus import stopwords 
 from nltk.tokenize import word_tokenize
 
 import matplotlib.pyplot as plt
 import seaborn as sns
 sns.set_theme(style="whitegrid")
+import wandb
+from tqdm import tqdm
 
 def load_data():
     train_msrp = './Data/MSRP/MSRParaphraseCorpus/msr-para-train.tsv'
@@ -32,7 +34,7 @@ def create_datasets(train_msrp_df, val_msrp_df, test_msrp_df):
 
 def preprocess(corpus):
     corpus_processed = [] 
-    for string in corpus:
+    for string in tqdm(corpus):
         string = str(string).lower()                                         
         words = word_tokenize(string)                                        
         words = [word for word in words if word not in stopwords.words('english')]  
@@ -51,29 +53,37 @@ def display_plots(df):
 
 def train():
     # Params
-    batch_size = 64
+    batch_size = 10
     lr = 3e-05
-    epochs = 9
+    epochs = 3
+    use_lda = False
+
+    use_wandb = False
+    if use_wandb:
+        config = {"learning_rate": lr,"epochs": epochs,"batch_size": batch_size}
+        wandb.init(project="AML-FP", entity="tomerkoren", config=config)
+
 
     # Load data
     train_msrp_df, val_msrp_df, test_msrp_df = load_data()
     train_msrp_dataset, val_msrp_dataset, test_msrp_dataset = create_datasets(train_msrp_df, val_msrp_df, test_msrp_df)
     train_dataloader = DataLoader(train_msrp_dataset, batch_size=batch_size, shuffle=True)
     val_dataloader = DataLoader(val_msrp_dataset, batch_size=batch_size, shuffle=True)
-    test_dataloader = DataLoader(test_msrp_dataset, batch_size=batch_size)
+    test_dataloader = DataLoader(test_msrp_dataset, batch_size=batch_size, shuffle=False)
 
-    num_topics = [70, 75, 80, 85, 90]
+    num_topics = [80]
     corpus = train_msrp_df.string1.values.tolist() + train_msrp_df.string2.values.tolist()
-    corpus = preprocess(corpus)
+    if use_lda:
+        corpus = preprocess(corpus)
     df = pd.DataFrame(columns=['#Topics','F1','Train_Loss','Val_Loss','Epoch'])
 
     for n in num_topics:
 
         # model
-        model = tBERT(corpus=corpus,num_topics=n).cuda()
+        model = tBERT(corpus=corpus,num_topics=n,use_lda=use_lda).cuda()
 
         # train
-        trainer = tBertTrainer(model, epochs=epochs, lr=lr)
+        trainer = tBertTrainer(model, epochs=epochs, lr=lr, use_wandb=use_wandb)
         trainer.fit(train_dataloader, val_dataloader)
 
         # predict

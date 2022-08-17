@@ -7,9 +7,10 @@ import os
 from tqdm import tqdm
 from torchmetrics import F1Score
 import copy
+import wandb
 
 class tBertTrainer():
-  def __init__(self, model, epochs = 5, lr=3e-3):
+  def __init__(self, model, epochs = 5, lr=3e-3, use_wandb=True):
     
     self.model = model
     self.best_val_model = None
@@ -24,10 +25,15 @@ class tBertTrainer():
     self.loss_val = []
     self.f1s = []
 
+    self.use_wandb = use_wandb
+    if use_wandb:
+      wandb.watch(self.model, criterion=self.loss, log="all", log_freq=1)
+      self.epoch_samples_number = 0
+      
+
   def fit(self, train_dataloader, val_dataloader):
 
     # put model in train mode
-    self.model.train()
     min_valid_loss = np.inf
     
     # run on all epochs
@@ -45,27 +51,28 @@ class tBertTrainer():
           self.best_val_model = copy.deepcopy(self.model)
           min_valid_loss = self.loss_val[-1]
 
+      if self.use_wandb:
+          wandb.log({"epoch_train_loss": self.loss_train[-1], "epoch_val_loss": self.loss_val[-1], "epoch_val_F1": self.f1s[-1], "epoch":e})
+
       print(f"Train Loss: {self.loss_train[-1]}, Val Loss: {self.loss_val[-1]}, Val F1: {self.f1s[-1]}")
-    self.model = self.best_val_model
 
   def train_epoch(self,train_dataloader):
     
-    self.model.train()
+    self.model.train(True)
     train_loss = 0
     num_batches = len(train_dataloader)
     for data in tqdm(train_dataloader):
       inputs1, inputs2, labels = data
-      inputs = [inputs1, inputs2]
 
       # Clear the gradients
       self.optimizer.zero_grad()
 
       # Forword
-      target = self.model(inputs)
+      target = self.model([inputs1, inputs2])
         
       # Calculate Loss
       labels = labels.type(torch.FloatTensor).unsqueeze(1).cuda()
-      loss = self.loss(target,labels)
+      loss = self.loss(target, labels)
 
       # Calculate gradients 
       loss.backward()
@@ -73,37 +80,49 @@ class tBertTrainer():
       # Update Weights
       self.optimizer.step()
 
-      # Calculate Loss
+      # Calculate Losss
       train_loss += loss.item()
+      del loss
+      del labels
+
+      if self.use_wandb:
+          wandb.log({"batch_train_loss": loss.item()},step=self.epoch_samples_number)
+          self.epoch_samples_number += 1
 
     self.loss_train.append(train_loss / num_batches)
+    torch.cuda.empty_cache()
 
   def validate_epoch(self, val_dataloader):
-    self.model.eval()
-    val_loss, f1s = 0, 0
+    self.model.train(False)
+    val_loss = 0
     num_batches = len(val_dataloader)
-    for data in val_dataloader:
-      inputs1, inputs2, labels = data
-      
-      # Forword
-      target = self.model([inputs1, inputs2])
-      
-      # Calculate loss
-      labels = labels.type(torch.FloatTensor).unsqueeze(1).cuda()
-      loss = self.loss(target,labels)
-      val_loss += loss.item()
+    labels_lst, preds_lst = [], []
+    with torch.no_grad():
+      for data in val_dataloader:
+        inputs1, inputs2, labels = data
+        
+        # Forword
+        target = self.model([inputs1, inputs2])
+        
+        # Calculate loss
+        labels = labels.type(torch.FloatTensor).unsqueeze(1).cuda()
+        loss = self.loss(target,labels)
+        val_loss += loss.item()
+        
+        # Store results
+        preds_lst.extend(target.cpu().detach()[:,0].tolist())
+        labels_lst.extend(labels.tolist())
 
-      # F1 score
-      f1_score = self.f1(target.round().cpu().detach()[:,0], labels.type(torch.IntTensor).cpu().detach()[:,0]).item()
-      f1s += f1_score
+        del loss
+        del labels
 
     self.loss_val.append(val_loss / num_batches)
-    self.f1s.append(f1s / num_batches)
+    f1_score =  self.f1(torch.tensor(np.round(preds_lst)), torch.tensor(labels_lst).type(torch.IntTensor)).item()
+    self.f1s.append(f1_score)
 
   def test(self, test_dataloader):
-    self.model.eval() 
-    labels = []
-    preds = []
+    self.model.train(False)
+    labels, preds = [], []
 
     with torch.no_grad():
       for data in test_dataloader:
@@ -111,11 +130,11 @@ class tBertTrainer():
 
         # Forword
         target = self.best_val_model([inputs1, inputs2])
-        target = target.round()
 
-        # Stroe results
+        # Store results
         preds.extend(target.cpu().detach()[:,0].tolist())
         labels.extend(label.tolist())
     
-    f1_score =  self.f1(torch.tensor(preds), torch.tensor(labels)).item()
+    f1_score =  self.f1(torch.tensor(np.round(preds)), torch.tensor(labels)).item()
+    print(f"Test F1: {f1_score}")
     return f1_score
