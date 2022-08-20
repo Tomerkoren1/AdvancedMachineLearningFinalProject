@@ -7,8 +7,6 @@ from gensim.models import CoherenceModel
 import nltk
 import gensim.corpora as corpora
 from gensim.utils import simple_preprocess
-from nltk.corpus import stopwords
-# from src.topic_model.topic_loader import get_topic_model_folder, get_topic_parent_folder
 
 
 
@@ -16,6 +14,7 @@ class LDA():
     def __init__(self, num_topics = 80, init_data_words = [''], to_evaluate= False):
 
         self.num_topics = num_topics
+        self.id2word = None
         print("Init data words preprocessing")
         corpus, self.id2word, processed_texts = self.lda_preprocess(init_data_words)
         self.model = gensim.models.ldamodel.LdaModel(corpus=corpus,
@@ -31,8 +30,9 @@ class LDA():
         if to_evaluate:
             self.evaluate_lda_topic_model()
     
-    def remove_stopwords(self, texts):
-        stop_words = self.stopwordsList()
+    @staticmethod
+    def remove_stopwords(texts):
+        stop_words = LDA.stopwordsList()
         return [[word for word in simple_preprocess(str(doc)) 
                 if word not in stop_words] for doc in texts]
                 
@@ -44,18 +44,14 @@ class LDA():
         :param print_steps: print intermediate output examples
         :return: preprocessed corpus as bag of wordids, id2word
         '''
-        # assert type(data_tokenized)==list
-        # assert type(data_tokenized[0])==list
-        # assert type(data_tokenized[0][0])==str
-        # data_finished = [self.removeShortLongWords(s) for s in data_tokenized]
-        # if delete_stopwords:
-        #     # print('removing stopwords')
-        #     data_finished = [self.removeStopwords(s) for s in data_finished]
-        data_finished = self.remove_stopwords(data_tokenized)
+        data_finished = LDA.remove_stopwords(data_tokenized)
 
         if id2word is None:
-            # Create Dictionary
-            id2word = corpora.Dictionary(data_finished)
+            if self.id2word is not None:
+                id2word = self.id2word
+            else:
+                # Create Dictionary
+                id2word = corpora.Dictionary(data_finished)
 
         # Create Corpus
         processed_texts = data_finished

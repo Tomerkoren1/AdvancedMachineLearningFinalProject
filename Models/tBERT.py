@@ -25,7 +25,7 @@ class tBERT(nn.Module):
         self.use_lda = use_lda
         lda_part = 0
         if self.use_lda:
-          self.lda_model = LDA(num_topics=num_topics, init_corpus=data_words)
+          self.lda_model = LDA(num_topics=num_topics, init_data_words=data_words)
           lda_part = 2 * num_topics
 
         n_classes=1

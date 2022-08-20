@@ -27,7 +27,6 @@ class tBertTrainer():
 
     self.use_wandb = use_wandb
     if use_wandb:
-      wandb.watch(self.model, criterion=self.loss, log="all", log_freq=1)
       self.epoch_samples_number = 0
       
 
@@ -82,12 +81,14 @@ class tBertTrainer():
 
       # Calculate Losss
       train_loss += loss.item()
-      del loss
-      del labels
 
       if self.use_wandb:
           wandb.log({"batch_train_loss": loss.item()},step=self.epoch_samples_number)
           self.epoch_samples_number += 1
+
+      # Delete resources
+      del loss
+      del labels
 
     self.loss_train.append(train_loss / num_batches)
     torch.cuda.empty_cache()
