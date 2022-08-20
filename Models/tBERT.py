@@ -1,7 +1,8 @@
 import torch
 from torch import nn
 from transformers import BertModel, BertTokenizer, logging
-from sklearn.decomposition import LatentDirichletAllocation as LDA
+from Models.LDA import LDA
+from nltk.tokenize import word_tokenize
 
 #Set the verbosity level
 logging.set_verbosity_error()
@@ -9,7 +10,7 @@ logging.set_verbosity_error()
 torch.seed = 123
 
 class tBERT(nn.Module):
-    def __init__(self, num_topics=80, batch_size=64, corpus=[''], use_lda=False, bert_update=True):
+    def __init__(self, num_topics=80, data_words=[''], use_lda=False, bert_update=True):
         super(tBERT, self).__init__()
 
         # Loading Bert model
@@ -24,9 +25,7 @@ class tBERT(nn.Module):
         self.use_lda = use_lda
         lda_part = 0
         if self.use_lda:
-          self.lda = LDA(n_components=num_topics, doc_topic_prior=10, batch_size=batch_size, n_jobs=-1)
-          corpus = self.tokenize(corpus)
-          self.lda.fit(corpus)
+          self.lda_model = LDA(num_topics=num_topics, init_corpus=data_words)
           lda_part = 2 * num_topics
 
         n_classes=1
@@ -62,17 +61,24 @@ class tBERT(nn.Module):
       features = features_bert
 
       if self.use_lda:
-        # Run LDA
-        tokens_lda1 = self.tokenize(inputs1)
-        features_lda1 = self.lda.transform(tokens_lda1)
-        features_lda1 = torch.tensor(features_lda1).type(torch.FloatTensor).cuda()
-        tokens_lda2 = self.tokenize(inputs2)
-        features_lda2 = self.lda.transform(tokens_lda2)
-        features_lda2 = torch.tensor(features_lda2).type(torch.FloatTensor).cuda()
+
+        # preprocess and infer topics
+        inputs1_p = [word_tokenize(st) for st in list(inputs1)]
+        new_corpus_1, _, new_processed_texts_1 = self.lda_model.lda_preprocess(inputs1_p, delete_stopwords=True)
+        topic_dist_1 = self.lda_model.infer_topic_dist(new_corpus_1)
+
+        # preprocess and infer topics
+        inputs2_p = [word_tokenize(st) for st in list(inputs2)]
+        new_corpus_2, _, new_processed_texts_2 = self.lda_model.lda_preprocess(inputs2_p, delete_stopwords=True)
+        topic_dist_2 = self.lda_model.infer_topic_dist(new_corpus_2)
+
+        # sanity check
+        assert(len(inputs1_p)==len(inputs2_p)==topic_dist_1.shape[0]==topic_dist_2.shape[0]) # same number of examples
+        assert(topic_dist_1.shape[1]==topic_dist_2.shape[1]) # same number of topics
       
         # concatenate lda features
-        features_lda = torch.cat([features_lda1, features_lda2],dim=1)
-        features_lda = features_lda
+        features_lda = torch.cat([torch.tensor(topic_dist_1).type(torch.FloatTensor), torch.tensor(topic_dist_2).type(torch.FloatTensor)],dim=1)
+        features_lda = features_lda.cuda()
 
         # concatenate
         features = torch.cat([features_lda, features_bert],dim=1)

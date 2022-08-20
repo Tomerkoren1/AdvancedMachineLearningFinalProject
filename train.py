@@ -3,17 +3,11 @@ from Models.tBERT import tBERT
 from Trainer.tBertTrainer import tBertTrainer
 from Dataset.PairSentencesDataset import PairSentencesDataset
 from torch.utils.data import DataLoader
-import nltk
-# nltk.download('stopwords')
-# nltk.download('averaged_perceptron_tagger')
-from nltk.corpus import stopwords 
-from nltk.tokenize import word_tokenize
-
 import matplotlib.pyplot as plt
 import seaborn as sns
 sns.set_theme(style="whitegrid")
 import wandb
-from tqdm import tqdm
+
 
 def load_data():
     train_msrp = './Data/MSRP/MSRParaphraseCorpus/msr-para-train.tsv'
@@ -32,17 +26,6 @@ def create_datasets(train_msrp_df, val_msrp_df, test_msrp_df):
 
     return train_msrp_dataset, val_msrp_dataset, test_msrp_dataset
 
-def preprocess(corpus):
-    corpus_processed = [] 
-    for string in tqdm(corpus):
-        string = str(string).lower()                                         
-        words = word_tokenize(string)                                        
-        words = [word for word in words if word not in stopwords.words('english')]  
-        words = [word for word in words if word.isalpha()]
-        string = ' '.join(words)
-        corpus_processed.append(string)                                                  
-    return corpus_processed
-
 def display_plots(df):
     sns.barplot(x="#Topics", y="F1", data=df)
     plt.show()
@@ -55,13 +38,11 @@ def train():
     # Params
     batch_size = 10
     lr = 3e-05
-    epochs = 3
-    use_lda = False
+    epochs = 9
+    use_lda = True
 
     use_wandb = False
-    if use_wandb:
-        config = {"learning_rate": lr,"epochs": epochs,"batch_size": batch_size}
-        wandb.init(project="AML-FP", entity="tomerkoren", config=config)
+
 
 
     # Load data
@@ -71,16 +52,18 @@ def train():
     val_dataloader = DataLoader(val_msrp_dataset, batch_size=batch_size, shuffle=True)
     test_dataloader = DataLoader(test_msrp_dataset, batch_size=batch_size, shuffle=False)
 
-    num_topics = [80]
-    corpus = train_msrp_df.string1.values.tolist() + train_msrp_df.string2.values.tolist()
-    if use_lda:
-        corpus = preprocess(corpus)
+    num_topics = [70, 75, 80, 85, 90]
+    data_words = train_msrp_df.string1.values.tolist() + train_msrp_df.string2.values.tolist()
     df = pd.DataFrame(columns=['#Topics','F1','Train_Loss','Val_Loss','Epoch'])
 
     for n in num_topics:
 
+        if use_wandb:
+            config = {"learning_rate": lr, "epochs": epochs, "batch_size": batch_size, "num_topics":num_topics, "use_lda":use_lda}
+            wandb.init(project="AML-FP", entity="tomerkoren", config=config)
+
         # model
-        model = tBERT(corpus=corpus,num_topics=n,use_lda=use_lda).cuda()
+        model = tBERT(data_words=data_words,num_topics=n,use_lda=use_lda).cuda()
 
         # train
         trainer = tBertTrainer(model, epochs=epochs, lr=lr, use_wandb=use_wandb)
