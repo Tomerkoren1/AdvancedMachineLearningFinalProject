@@ -37,12 +37,6 @@ class tBERT(nn.Module):
             nn.Sigmoid()
         )
 
-    def tokenize(self, sentence_to_tokenize):
-      return self.tokenizer_bert(sentence_to_tokenize,return_tensors='pt',padding="max_length", pad_to_max_length=True,truncation=True)["input_ids"]
-
-    def tokenize_2_sentences(self,sentence1,sentence2):
-      return self.tokenizer_bert(sentence1,sentence2,return_tensors='pt',padding="max_length", pad_to_max_length=True,truncation=True)["input_ids"]
-
     def forward(self, inputs):
       inputs1,inputs2 = inputs
       
