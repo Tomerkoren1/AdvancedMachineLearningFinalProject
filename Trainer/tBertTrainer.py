@@ -10,7 +10,7 @@ import copy
 import wandb
 
 class tBertTrainer():
-  def __init__(self, model, epochs = 5, lr=3e-3, use_wandb=True):
+  def __init__(self, model, epochs = 5, lr=3e-5, use_wandb=True):
     
     self.model = model
     self.best_val_model = None
@@ -18,6 +18,7 @@ class tBertTrainer():
     
     self.loss = nn.BCELoss()
     self.optimizer = torch.optim.Adam(self.model.parameters(),lr=lr)
+    self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[4,7], gamma=0.1)
 
     # Metrics
     self.f1 = F1Score(num_classes=1)
@@ -45,6 +46,9 @@ class tBertTrainer():
       # eval      
       self.validate_epoch(val_dataloader)
 
+      # scheduler step
+      self.scheduler.step()
+
       # save the optimal model    
       if min_valid_loss > self.loss_val[-1]:
           self.best_val_model = copy.deepcopy(self.model)
@@ -54,6 +58,8 @@ class tBertTrainer():
           wandb.log({"epoch_train_loss": self.loss_train[-1], "epoch_val_loss": self.loss_val[-1], "epoch_val_F1": self.f1s[-1], "epoch":e})
 
       print(f"Train Loss: {self.loss_train[-1]}, Val Loss: {self.loss_val[-1]}, Val F1: {self.f1s[-1]}")
+
+      
 
   def train_epoch(self,train_dataloader):
     
@@ -117,12 +123,12 @@ class tBertTrainer():
         del loss
         del labels
 
-    self.loss_val.append(val_loss / num_batches)
+    self.loss_val.append((val_loss / num_batches))
     f1_score =  self.f1(torch.tensor(np.round(preds_lst)), torch.tensor(labels_lst).type(torch.IntTensor)).item()
     self.f1s.append(f1_score)
 
   def test(self, test_dataloader):
-    self.model.train(False)
+    self.best_val_model.train(False)
     labels, preds = [], []
 
     with torch.no_grad():

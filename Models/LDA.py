@@ -9,7 +9,6 @@ import gensim.corpora as corpora
 from gensim.utils import simple_preprocess
 
 
-
 class LDA():
     def __init__(self, num_topics = 80, init_data_words = [''], to_evaluate= False):
 
@@ -61,6 +60,29 @@ class LDA():
 
         return corpus, id2word, processed_texts
     
+    @staticmethod
+    def static_lda_preprocess(data_tokenized, id2word=None, delete_stopwords=True):
+        '''
+        Preprocess tokenized text data for LDA (deleting stopwords, recognising ngrams, lemmatisation
+        :param data_tokenized: tokenized text data as nested list of tokens
+        :param id2word: preexisting id2word object (to map dev or test split to identical ids), otherwise None (train split)
+        :param print_steps: print intermediate output examples
+        :return: preprocessed corpus as bag of wordids, id2word
+        '''
+        data_finished = LDA.remove_stopwords(data_tokenized)
+
+        if id2word is None:
+            # Create Dictionary
+            id2word = corpora.Dictionary(data_finished)
+
+        # Create Corpus
+        processed_texts = data_finished
+
+        # Term Document Frequency
+        corpus = [id2word.doc2bow(text) for text in processed_texts]
+
+        return corpus, id2word, processed_texts
+
     @staticmethod
     def stopwordsList():
         stopwords = nltk.corpus.stopwords.words('english')

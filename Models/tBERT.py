@@ -10,6 +10,10 @@ logging.set_verbosity_error()
 torch.seed = 123
 
 class tBERT(nn.Module):
+
+    bert_output_size = 768
+    n_classes=1
+
     def __init__(self, num_topics=80, data_words=[''], use_lda=False, bert_update=True):
         super(tBERT, self).__init__()
 
@@ -28,15 +32,19 @@ class tBERT(nn.Module):
           self.lda_model = LDA(num_topics=num_topics, init_data_words=data_words)
           lda_part = 2 * num_topics
 
+        # # Classifier
         n_classes=1
+        input_size = self.bert_output_size + lda_part
         self.classifier = nn.Sequential(
-            nn.Linear(768 + lda_part, 464, bias=True),
+            nn.Linear(input_size, 256, bias=True),
             nn.Tanh(),
-            nn.Dropout(p=0.1),
-            nn.Linear(464, n_classes, bias=True),
+            nn.Linear(256, 256, bias=True),
+            nn.Tanh(),
+            nn.Dropout(p=0.3),
+            nn.Linear(256, n_classes, bias=True),
             nn.Sigmoid()
         )
-
+        
     def forward(self, inputs):
       inputs1,inputs2 = inputs
       
@@ -60,6 +68,7 @@ class tBERT(nn.Module):
         inputs1_p = [word_tokenize(st) for st in list(inputs1)]
         new_corpus_1, _, new_processed_texts_1 = self.lda_model.lda_preprocess(inputs1_p, delete_stopwords=True)
         topic_dist_1 = self.lda_model.infer_topic_dist(new_corpus_1)
+        
 
         # preprocess and infer topics
         inputs2_p = [word_tokenize(st) for st in list(inputs2)]
@@ -73,6 +82,7 @@ class tBERT(nn.Module):
         # concatenate lda features
         features_lda = torch.cat([torch.tensor(topic_dist_1).type(torch.FloatTensor), torch.tensor(topic_dist_2).type(torch.FloatTensor)],dim=1)
         features_lda = features_lda.cuda()
+        features_lda = nn.functional.normalize(features_lda, p=2, dim=1)
 
         # concatenate
         features = torch.cat([features_lda, features_bert],dim=1)

@@ -9,8 +9,6 @@ import seaborn as sns
 sns.set_theme(style="whitegrid")
 
 
-
-
 def display_plots(df):
     sns.barplot(x="#Topics", y="F1", data=df)
     plt.show()
@@ -24,11 +22,15 @@ def train():
     batch_size = 10
     lr = 3e-05
     epochs = 9
-    use_lda = True
-    use_wandb = False
 
-    # Load data
-    train_msrp_df, val_msrp_df, test_msrp_df = load_data()
+    # Running Parameters
+    use_lda = True
+    use_wandb = True
+    use_aug =  True
+    entity = "Enter Your Wandb User"
+
+    # Load datas
+    train_msrp_df, val_msrp_df, test_msrp_df = load_data(use_aug)
     train_msrp_dataset, val_msrp_dataset, test_msrp_dataset = create_datasets(train_msrp_df, val_msrp_df, test_msrp_df)
     train_dataloader = DataLoader(train_msrp_dataset, batch_size=batch_size, shuffle=True)
     val_dataloader = DataLoader(val_msrp_dataset, batch_size=batch_size, shuffle=True)
@@ -36,13 +38,14 @@ def train():
 
     num_topics = [70, 75, 80, 85, 90]
     data_words = train_msrp_df.string1.values.tolist() + train_msrp_df.string2.values.tolist()
+
     df = pd.DataFrame(columns=['#Topics','F1','Train_Loss','Val_Loss','Epoch'])
 
     for n in num_topics:
 
         if use_wandb:
-            config = {"learning_rate": lr, "epochs": epochs, "batch_size": batch_size, "num_topics":num_topics, "use_lda":use_lda}
-            run = wandb.init(project="AML-FP", entity="tomerkoren", config=config, reinit=True)
+            config = {"learning_rate": lr, "epochs": epochs, "batch_size": batch_size, "num_topics":n, "use_lda":use_lda}
+            run = wandb.init(project="AML-FP", entity=entity, config=config, reinit=True)
 
         # model
         model = tBERT(data_words=data_words,num_topics=n,use_lda=use_lda).cuda()
