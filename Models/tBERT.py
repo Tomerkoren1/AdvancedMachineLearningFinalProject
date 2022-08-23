@@ -40,7 +40,7 @@ class tBERT(nn.Module):
             nn.Tanh(),
             nn.Linear(256, 256, bias=True),
             nn.Tanh(),
-            nn.Dropout(p=0.3),
+            nn.Dropout(p=0.2),
             nn.Linear(256, n_classes, bias=True),
             nn.Sigmoid()
         )
