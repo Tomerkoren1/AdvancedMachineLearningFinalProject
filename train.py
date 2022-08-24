@@ -6,8 +6,27 @@ from Trainer.tBertTrainer import tBertTrainer
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 import seaborn as sns
+import argparse
 sns.set_theme(style="whitegrid")
 
+def cli():
+    """ Handle argument parsing
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--learning-rate', type=float, default=3e-05,
+                        help='learning rate')
+    parser.add_argument('--epoch-num', type=int, default=9,
+                        help='epoch number')
+    parser.add_argument('--batch-size', type=int, default=10,
+                        help='batch_size')
+    parser.add_argument('--use-wandb', action='store_true', help='use wandb')
+    parser.add_argument('--wandb-entity', help='Enter your wandb entity')
+    parser.add_argument('--use-aug', action='store_true', help='use augmentation')
+    parser.add_argument('--use-lda', action='store_true', help='use LDA topic model')
+
+    args = parser.parse_args()
+
+    return args
 
 def display_plots(df):
     sns.barplot(x="#Topics", y="F1", data=df)
@@ -18,16 +37,17 @@ def display_plots(df):
     plt.show()
 
 def train():
-    # Params
-    batch_size = 10
-    lr = 3e-05
-    epochs = 9
+    # Parse command line
+    userArgs = cli()
+    print(vars(userArgs))
 
     # Running Parameters
-    use_lda = True
-    use_wandb = True
-    use_aug =  True
-    entity = "Enter Your Wandb User"
+    batch_size = userArgs.batch_size
+    lr = userArgs.learning_rate
+    epochs = userArgs.epoch_num
+    use_lda = userArgs.use_lda
+    use_wandb = userArgs.use_wandb
+    use_aug =  userArgs.use_aug
 
     # Load datas
     train_msrp_df, val_msrp_df, test_msrp_df = load_data(use_aug)
@@ -44,8 +64,8 @@ def train():
     for n in num_topics:
 
         if use_wandb:
-            config = {"learning_rate": lr, "epochs": epochs, "batch_size": batch_size, "num_topics":n, "use_lda":use_lda}
-            run = wandb.init(project="AML-FP", entity=entity, config=config, reinit=True)
+            run = wandb.init(project="AML-FP", entity=userArgs.wandb_entity, config=vars(userArgs), reinit=True)
+            userArgs = run.config
 
         # model
         model = tBERT(data_words=data_words,num_topics=n,use_lda=use_lda).cuda()
@@ -59,7 +79,7 @@ def train():
 
         # save model results
         df_topic = pd.DataFrame({'#Topics':str(n),'F1':f1_score,'Train_Loss':trainer.loss_train,'Val_Loss':trainer.loss_val,'Epoch':range(epochs)})
-        df = df.append(df_topic, ignore_index=True)
+        df = pd.concat([df,df_topic], ignore_index=True)
 
         if use_wandb:
             wandb.log({'test_F1':f1_score})
