@@ -14,7 +14,7 @@ pip install -r .\requirements.txt
 - Run the following:
 ```bash
 python train.py
-``
+```
 - The following parameters are supported:
 1. --batch_size - batch size (default=10)
 2. --learning_rate - chose learning rate value (default=3e-05)
@@ -24,7 +24,7 @@ python train.py
 6. --use_wandb - use wandb
 7. --wandb-entity - enter your wandb entity
 
-### Hyper Parameters
+## Hyper Parameters
 We use the wandb sweep feature to run hyper parameters optimization. To reprduce our work please do the following:
 - Create an account for wandb and login on your computer. For more details, see https://wandb.ai/site
 - Create a new project
